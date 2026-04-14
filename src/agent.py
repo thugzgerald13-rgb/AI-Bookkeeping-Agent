@@ -1,44 +1,41 @@
-import langchain as lc
+import os
+from langchain import LLMFactory, BookkeepingTools
 
-# Define tools for the agent
+def get_llm_provider(provider_name):
+    """
+    Returns the appropriate LLM provider based on provider_name.
+    Supported providers: "OpenAI", "Anthropic", "Google".
+    """    
+    if provider_name == "OpenAI":
+        return LLMFactory.create_openai()
+    elif provider_name == "Anthropic":
+        return LLMFactory.create_anthropic()
+    elif provider_name == "Google":
+        return LLMFactory.create_google()
+    else:
+        raise ValueError(f"Invalid provider: {provider_name}")
 
-def process_transaction(transaction):
-    """Process a financial transaction."""
-    # TODO: Implement transaction processing logic
-    return f"Processed transaction: {transaction}"
+class ReactBookkeepingAgent:
+    def __init__(self, provider_name):
+        self.llm = get_llm_provider(provider_name)
+        self.tools = BookkeepingTools()
 
+    def process_transaction(self, transaction):
+        self.tools.process(transaction)
 
-def categorize_expense(expense):
-    """Categorize a financial expense."""
-    # TODO: Implement expense categorization logic
-    return f"Categorized expense: {expense}"
+    def categorize_expense(self, expense):
+        return self.tools.categorize(expense)
 
+    def generate_report(self, report_type):
+        return self.tools.generate(report_type)
 
-def generate_report(transactions):
-    """Generate a financial report from transactions."""
-    # TODO: Implement report generation logic
-    return f"Generated report for {len(transactions)} transactions"
+    def get_account_balance(self, account_id):
+        return self.tools.get_balance(account_id)
 
+    def create_ledger(self, entries):
+        return self.tools.create_ledger(entries)
 
-# Initialize the agent with multiple LLM models
-class AIAgent:
-    def __init__(self, llm_model='gpt-4'):
-        self.llm_model = llm_model
-        self.tools = {
-            'process_transaction': process_transaction,
-            'categorize_expense': categorize_expense,
-            'generate_report': generate_report
-        }
-
-    def reason(self, input_data):
-        # TODO: Implement reasoning loop for the agent
-        response = f"Using {self.llm_model} to process input: {input_data}"
-        for tool_name, tool in self.tools.items():
-            response += f", {tool_name}: {tool(input_data)}"
-        return response
-
-
+# Example usage:
 if __name__ == '__main__':
-    agent = AIAgent(llm_model='gpt-4')
-    test_data = {'transaction': 'Buy coffee', 'expense': 5.0}
-    print(agent.reason(test_data))
+    agent = ReactBookkeepingAgent(provider_name="OpenAI")
+    # agent processes transactions, categorizes expenses, etc.
