@@ -19,6 +19,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Hide Manage App button ────────────────────────────────────────────────────
+st.markdown("""
+<style>
+[data-testid="manage-app-button"] {display: none !important;}
+</style>
+""", unsafe_allow_html=True)
+
 # ── Inject minimal CSS ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
