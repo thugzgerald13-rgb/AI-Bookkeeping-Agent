@@ -23,6 +23,10 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="manage-app-button"] {display: none !important;}
+[data-testid="stToolbarActions"] {display: none !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
+#MainMenu {visibility: hidden !important;}
+footer {visibility: hidden !important;}
 </style>
 """, unsafe_allow_html=True)
 
