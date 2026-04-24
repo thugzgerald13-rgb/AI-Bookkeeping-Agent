@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ai-bookkeeping-agent
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # Set this manually in Render dashboard
+      - key: APP_NAME
+        value: AI Bookkeeping Agent
+      - key: APP_VERSION
+        value: "2.0.0"
+      - key: COMPANY_NAME
+        value: My Business
+      - key: CURRENCY
+        value: PHP
+      - key: DB_PATH
+        value: data/bookkeeping.db
+    disk:
+      name: bookkeeping-data
+      mountPath: /app/data
+      sizeGB: 1

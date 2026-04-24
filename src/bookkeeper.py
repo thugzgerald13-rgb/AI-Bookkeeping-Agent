@@ -1,9 +1,12 @@
-from enum import Enum
+import sqlite3
 import logging
-from typing import List, Union
+import csv
+import datetime
+from enum import Enum
+from typing import List, Optional, Dict, Tuple
+from dataclasses import dataclass, field
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class TransactionType(Enum):
@@ -18,94 +21,219 @@ class ExpenseCategory(Enum):
     TRANSPORT = 'Transport'
     UTILITIES = 'Utilities'
     ENTERTAINMENT = 'Entertainment'
+    SALARY = 'Salary'
+    RENT = 'Rent'
+    SUPPLIES = 'Supplies'
+    MARKETING = 'Marketing'
+    PROFESSIONAL_FEES = 'Professional Fees'
+    TAXES = 'Taxes'
     OTHER = 'Other'
 
 
+@dataclass
 class Transaction:
-    def __init__(self, trans_type: TransactionType, amount: float, category: Union[ExpenseCategory, None] = None, description: str = ''):
-        self.trans_type = trans_type
-        self.amount = amount
-        self.category = category
-        self.description = description
-        self.timestamp = logging.Formatter().formatTime(logging.LogRecord('', 0, '', 0, '', '', [], None))
+    trans_type: TransactionType
+    amount: float
+    category: Optional[ExpenseCategory] = None
+    description: str = ''
+    date: str = field(default_factory=lambda: datetime.datetime.now().strftime('%Y-%m-%d'))
+    id: Optional[int] = None
+    reference: str = ''
+    ai_notes: str = ''
+
+    def to_dict(self) -> Dict:
+        return {
+            'id': self.id,
+            'date': self.date,
+            'type': self.trans_type.value,
+            'amount': self.amount,
+            'category': self.category.value if self.category else 'Uncategorized',
+            'description': self.description,
+            'reference': self.reference,
+            'ai_notes': self.ai_notes,
+        }
 
 
-class Ledger:
-    def __init__(self):
-        self.transactions = []
-        self.accounts = {'main': 0.0}
+class Database:
+    def __init__(self, db_path: str = "data/bookkeeping.db"):
+        import os
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        self.db_path = db_path
+        self._init_db()
 
-    def add_transaction(self, transaction: Transaction):
-        self.transactions.append(transaction)
-        logging.info(f'Transaction added: {transaction.__dict__}')
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    category TEXT,
+                    description TEXT,
+                    reference TEXT,
+                    ai_notes TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            conn.commit()
 
-    def get_account_balance(self, account_name: str = 'main') -> float:
-        balance = self.accounts.get(account_name, 0.0)
-        logging.debug(f'Balance for account {account_name}: {balance}')
-        return balance
+    def insert(self, t: Transaction) -> int:
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.execute(
+                "INSERT INTO transactions (date, type, amount, category, description, reference, ai_notes) VALUES (?,?,?,?,?,?,?)",
+                (t.date, t.trans_type.value, t.amount,
+                 t.category.value if t.category else None,
+                 t.description, t.reference, t.ai_notes)
+            )
+            conn.commit()
+            return cur.lastrowid
 
-    def get_ledger_summary(self) -> str:
-        summary = f'Transaction Summary:\n'
-        for t in self.transactions:
-            summary += f'- {t.trans_type.value}: {t.amount} {t.category.name if t.category else ''} - {t.description}\n'
-        logging.debug(summary)
-        return summary
+    def fetch_all(self, limit: int = 500) -> List[Dict]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM transactions ORDER BY date DESC, id DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def fetch_summary(self) -> Dict:
+        with sqlite3.connect(self.db_path) as conn:
+            income = conn.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='income'"
+            ).fetchone()[0]
+            expense = conn.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='expense'"
+            ).fetchone()[0]
+            count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        return {
+            'total_income': income,
+            'total_expense': expense,
+            'net': income - expense,
+            'transaction_count': count,
+        }
+
+    def fetch_by_category(self) -> List[Tuple]:
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """SELECT category, type, SUM(amount) as total, COUNT(*) as count
+                   FROM transactions
+                   GROUP BY category, type
+                   ORDER BY total DESC"""
+            ).fetchall()
+            return rows
+
+    def fetch_monthly(self) -> List[Tuple]:
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """SELECT strftime('%Y-%m', date) as month, type, SUM(amount) as total
+                   FROM transactions
+                   GROUP BY month, type
+                   ORDER BY month DESC
+                   LIMIT 24"""
+            ).fetchall()
+            return rows
+
+    def delete(self, transaction_id: int) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM transactions WHERE id=?", (transaction_id,))
+            conn.commit()
+        return True
 
 
 class Bookkeeper:
-    def __init__(self):
-        self.ledger = Ledger()
+    def __init__(self, db_path: str = "data/bookkeeping.db"):
+        self.db = Database(db_path)
+        logging.info("Bookkeeper initialized with SQLite persistence.")
 
-    def process_transaction(self, trans_type: TransactionType, amount: float, category: Union[ExpenseCategory, None] = None, description: str = ''):
+    def process_transaction(
+        self,
+        trans_type: TransactionType,
+        amount: float,
+        category: Optional[ExpenseCategory] = None,
+        description: str = '',
+        date: Optional[str] = None,
+        reference: str = '',
+        ai_notes: str = '',
+    ) -> Optional[Transaction]:
         if amount <= 0:
-            logging.error('Transaction amount must be positive. Transaction not processed.')
-            return
-        transaction = Transaction(trans_type, amount, category, description)
-        self.ledger.add_transaction(transaction)
-        self.update_account_balance(trans_type, amount)
+            logging.error("Transaction amount must be positive.")
+            return None
 
-    def update_account_balance(self, trans_type: TransactionType, amount: float):
-        if trans_type == TransactionType.INCOME:
-            self.ledger.accounts['main'] += amount
-            logging.info('Income processed.')
-        elif trans_type == TransactionType.EXPENSE:
-            self.ledger.accounts['main'] -= amount
-            logging.info('Expense processed.')
-        elif trans_type == TransactionType.TRANSFER:
-            # Implement transfer logic if needed
-            logging.info('Transfer processed (not implemented).')
-        elif trans_type == TransactionType.ADJUSTMENT:
-            # Implement adjustment logic if needed
-            logging.info('Adjustment processed (not implemented).')
+        transaction = Transaction(
+            trans_type=trans_type,
+            amount=amount,
+            category=category,
+            description=description,
+            date=date or datetime.datetime.now().strftime('%Y-%m-%d'),
+            reference=reference,
+            ai_notes=ai_notes,
+        )
+        transaction.id = self.db.insert(transaction)
+        logging.info(f"Transaction #{transaction.id} saved: {trans_type.value} {amount}")
+        return transaction
 
-    def categorize_expense(self, amount: float, description: str) -> ExpenseCategory:
-        category = ExpenseCategory.OTHER  # Default category
-        if 'food' in description.lower():
-            category = ExpenseCategory.FOOD
-        elif 'transport' in description.lower():
-            category = ExpenseCategory.TRANSPORT
-        elif 'utilities' in description.lower():
-            category = ExpenseCategory.UTILITIES
-        elif 'entertainment' in description.lower():
-            category = ExpenseCategory.ENTERTAINMENT
-        logging.info(f'Expense categorized: {category}')
-        return category
+    def categorize_expense(self, description: str) -> ExpenseCategory:
+        """Rule-based categorization (AI categorization done in agent.py)."""
+        desc = description.lower()
+        if any(w in desc for w in ['food', 'meal', 'lunch', 'dinner', 'grocery', 'restaurant']):
+            return ExpenseCategory.FOOD
+        elif any(w in desc for w in ['transport', 'taxi', 'uber', 'grab', 'fuel', 'gas', 'parking']):
+            return ExpenseCategory.TRANSPORT
+        elif any(w in desc for w in ['electric', 'water', 'internet', 'phone', 'utilities']):
+            return ExpenseCategory.UTILITIES
+        elif any(w in desc for w in ['salary', 'payroll', 'wage']):
+            return ExpenseCategory.SALARY
+        elif any(w in desc for w in ['rent', 'lease']):
+            return ExpenseCategory.RENT
+        elif any(w in desc for w in ['office', 'supplies', 'stationery']):
+            return ExpenseCategory.SUPPLIES
+        elif any(w in desc for w in ['ads', 'marketing', 'promo', 'advertising']):
+            return ExpenseCategory.MARKETING
+        elif any(w in desc for w in ['consultant', 'lawyer', 'accountant', 'professional']):
+            return ExpenseCategory.PROFESSIONAL_FEES
+        elif any(w in desc for w in ['tax', 'bir', 'vat', 'withholding']):
+            return ExpenseCategory.TAXES
+        elif any(w in desc for w in ['entertainment', 'event', 'party']):
+            return ExpenseCategory.ENTERTAINMENT
+        return ExpenseCategory.OTHER
 
-    def generate_report(self):
-        report = self.ledger.get_ledger_summary()
-        logging.info('Report generated.')
-        return report
+    def get_summary(self) -> Dict:
+        return self.db.fetch_summary()
 
-    def export_transactions(self, file_name: str):
-        with open(file_name, 'w') as file:
-            for transaction in self.ledger.transactions:
-                file.write(f'{transaction.__dict__}\n')
-        logging.info(f'Transactions exported to {file_name}')
+    def get_transactions(self, limit: int = 200) -> List[Dict]:
+        return self.db.fetch_all(limit)
 
+    def get_category_breakdown(self) -> List[Tuple]:
+        return self.db.fetch_by_category()
 
-# Example usage:
-# bookkeeper = Bookkeeper()
-# bookkeeper.process_transaction(TransactionType.INCOME, 100, description='Salary')
-# bookkeeper.process_transaction(TransactionType.EXPENSE, 20, category=ExpenseCategory.FOOD, description='Groceries')
-# report = bookkeeper.generate_report()  
-# print(report)
+    def get_monthly_trend(self) -> List[Tuple]:
+        return self.db.fetch_monthly()
+
+    def generate_report(self) -> str:
+        summary = self.get_summary()
+        lines = [
+            "=" * 50,
+            "       AI BOOKKEEPING AGENT — REPORT",
+            "=" * 50,
+            f"Total Income:  ₱{summary['total_income']:>12,.2f}",
+            f"Total Expense: ₱{summary['total_expense']:>12,.2f}",
+            f"Net Balance:   ₱{summary['net']:>12,.2f}",
+            f"Transactions:  {summary['transaction_count']:>12}",
+            "=" * 50,
+        ]
+        return "\n".join(lines)
+
+    def export_csv(self, file_path: str = "data/export.csv") -> str:
+        transactions = self.get_transactions(limit=10000)
+        if not transactions:
+            return ""
+        with open(file_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=transactions[0].keys())
+            writer.writeheader()
+            writer.writerows(transactions)
+        logging.info(f"Exported {len(transactions)} transactions to {file_path}")
+        return file_path
+
+    def delete_transaction(self, transaction_id: int) -> bool:
+        return self.db.delete(transaction_id)

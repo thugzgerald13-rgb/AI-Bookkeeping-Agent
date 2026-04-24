@@ -1,44 +1,45 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class APIConfig:
-    def __init__(self, api_type):
-        self.api_type = api_type
-        self.api_key = os.getenv(f'{api_type.upper()}_API_KEY')
-        
+    def __init__(self):
+        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
 class DatabaseConfig:
-    def __init__(self, db_type):
-        self.db_type = db_type
-        self.connection_string = os.getenv(f'{db_type.upper()}_DB_CONNECTION_STRING')
-        
+    def __init__(self):
+        self.db_path = os.getenv("DB_PATH", "data/bookkeeping.db")
+
 class LoggingConfig:
-    def __init__(self, log_level='INFO'):
-        self.log_level = log_level
-        
-class AgentConfig:
-    def __init__(self, pattern='ReAct'):
-        self.pattern = pattern
-        
+    def __init__(self):
+        self.log_level = os.getenv("LOG_LEVEL", "INFO")
+
 class AppConfig:
     def __init__(self):
-        self.app_name = os.getenv('APP_NAME', 'AI Bookkeeping Agent')
-        self.version = os.getenv('APP_VERSION', '1.0')
-        
+        self.app_name = os.getenv("APP_NAME", "AI Bookkeeping Agent")
+        self.version = os.getenv("APP_VERSION", "2.0.0")
+        self.company_name = os.getenv("COMPANY_NAME", "My Business")
+        self.currency = os.getenv("CURRENCY", "PHP")
+
 class ConfigManager:
-    def __init__(self):
-        self.api_config = APIConfig('OpenAI')  # Default to OpenAI
-        self.database_config = DatabaseConfig('SQLite')  # Default to SQLite
-        self.logging_config = LoggingConfig()
-        self.agent_config = AgentConfig()
-        self.app_config = AppConfig()  
-        
-    def get_config(self):
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.api = APIConfig()
+            cls._instance.database = DatabaseConfig()
+            cls._instance.logging = LoggingConfig()
+            cls._instance.app = AppConfig()
+        return cls._instance
+
+    def to_dict(self):
         return {
-            'API': self.api_config.__dict__,
-            'Database': self.database_config.__dict__,
-            'Logging': self.logging_config.__dict__,
-            'Agent': self.agent_config.__dict__,
-            'Application': self.app_config.__dict__,
+            "app": self.app.__dict__,
+            "database": self.database.__dict__,
+            "logging": self.logging.__dict__,
         }
 
-# Initialize ConfigManager
-config_manager = ConfigManager()
+config = ConfigManager()

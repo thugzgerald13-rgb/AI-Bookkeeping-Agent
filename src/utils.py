@@ -1,1 +1,80 @@
-import os\nimport json\nimport logging\nimport hashlib\nimport datetime\nfrom functools import wraps\nfrom typing import Any, Callable, Union, List, Dict\n\n# Configure logging\nlogging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')\n\nclass UtilityFunctions:\n    @staticmethod\n    def log(message: str) -> None:\n        logging.info(message)\n\n    @staticmethod\n    def validate_type(variable: Any, expected_type: type) -> bool:\n        return isinstance(variable, expected_type)\n\n    @staticmethod\n    def format_date(date: datetime.date) -> str:\n        return date.strftime('%Y-%m-%d')\n\n    @staticmethod\n    def hash_string(string: str) -> str:\n        return hashlib.sha256(string.encode()).hexdigest()\n\n    @staticmethod\n    def json_to_dict(json_string: str) -> Dict:\n        return json.loads(json_string)\n\n    @staticmethod\n    def dict_to_json(dictionary: Dict) -> str:\n        return json.dumps(dictionary, indent=4)\n\n    @staticmethod\n    def current_datetime() -> str:\n        return datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')\n\n    @staticmethod\n    def read_file(file_path: str) -> str:\n        with open(file_path, 'r') as file:\n            return file.read()\n\n    @staticmethod\n    def write_file(file_path: str, content: str) -> None:\n        with open(file_path, 'w') as file:\n            file.write(content)\n\n    @staticmethod\n    def retry(times: int) -> Callable:\n        def decorator(function: Callable) -> Callable:\n            @wraps(function)\n            def wrapper(*args, **kwargs) -> Any:\n                for _ in range(times):\n                    try:\n                        return function(*args, **kwargs)\n                    except Exception as e:\n                        logging.warning(f'Execution failed: {e}')\n                return None\n            return wrapper\n        return decorator\n\n    @staticmethod\n    def add(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:\n        return a + b\n\n    @staticmethod\n    def subtract(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:\n        return a - b\n\n    @staticmethod\n    def multiply(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:\n        return a * b\n\n    @staticmethod\n    def divide(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:\n        return a / b if b != 0 else 'Division by zero!'\n\n    @staticmethod\n    def list_to_dict(lst: List[str]) -> Dict[str, int]:\n        return {item: index for index, item in enumerate(lst)}\n\n    @staticmethod\n    def flatten_list(lst: List[List[Any]]) -> List[Any]:\n        return [item for sublist in lst for item in sublist]\n\n    @staticmethod\n    def get_env_variable(var_name: str) -> str:\n        return os.getenv(var_name, '')\n\n    @staticmethod\n    def handle_exception(e: Exception) -> None:\n        logging.error(f'Error occurred: {e}')
+import os
+import json
+import logging
+import hashlib
+import datetime
+from functools import wraps
+from typing import Any, Callable, Union, List, Dict
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+class UtilityFunctions:
+    @staticmethod
+    def log(message: str) -> None:
+        logging.info(message)
+
+    @staticmethod
+    def validate_type(variable: Any, expected_type: type) -> bool:
+        return isinstance(variable, expected_type)
+
+    @staticmethod
+    def format_date(date: datetime.date) -> str:
+        return date.strftime('%Y-%m-%d')
+
+    @staticmethod
+    def hash_string(string: str) -> str:
+        return hashlib.sha256(string.encode()).hexdigest()
+
+    @staticmethod
+    def json_to_dict(json_string: str) -> Dict:
+        return json.loads(json_string)
+
+    @staticmethod
+    def dict_to_json(dictionary: Dict) -> str:
+        return json.dumps(dictionary, indent=4)
+
+    @staticmethod
+    def current_datetime() -> str:
+        return datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+    @staticmethod
+    def read_file(file_path: str) -> str:
+        with open(file_path, 'r') as file:
+            return file.read()
+
+    @staticmethod
+    def write_file(file_path: str, content: str) -> None:
+        with open(file_path, 'w') as file:
+            file.write(content)
+
+    @staticmethod
+    def retry(times: int) -> Callable:
+        def decorator(function: Callable) -> Callable:
+            @wraps(function)
+            def wrapper(*args, **kwargs) -> Any:
+                for attempt in range(times):
+                    try:
+                        return function(*args, **kwargs)
+                    except Exception as e:
+                        logging.warning(f'Attempt {attempt + 1} failed: {e}')
+                return None
+            return wrapper
+        return decorator
+
+    @staticmethod
+    def safe_divide(a: Union[int, float], b: Union[int, float]) -> Union[int, float, str]:
+        return a / b if b != 0 else 0.0
+
+    @staticmethod
+    def get_env_variable(var_name: str, default: str = '') -> str:
+        return os.getenv(var_name, default)
+
+    @staticmethod
+    def handle_exception(e: Exception) -> None:
+        logging.error(f'Error occurred: {e}')
+
+    @staticmethod
+    def format_currency(amount: float, currency: str = "PHP") -> str:
+        symbol = {"PHP": "₱", "USD": "$", "EUR": "€"}.get(currency, currency)
+        return f"{symbol}{amount:,.2f}"
