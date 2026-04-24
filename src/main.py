@@ -19,6 +19,48 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Hide Streamlit UI chrome (Manage App, footer, menu) ──────────────────────
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden !important;}
+footer {visibility: hidden !important;}
+header {visibility: hidden !important;}
+[data-testid="manage-app-button"] {display: none !important;}
+[data-testid="stToolbar"] {display: none !important;}
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
+.stDeployButton {display: none !important;}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Password Lock ─────────────────────────────────────────────────────────────
+APP_PASSWORD = os.getenv("APP_PASSWORD", "capo2024")
+
+def check_password():
+    if st.session_state.get("authenticated"):
+        return True
+    st.markdown("""
+    <div style="max-width:380px;margin:80px auto;text-align:center;">
+        <div style="font-size:48px;margin-bottom:8px;">📒</div>
+        <h2 style="margin-bottom:4px;">AI Bookkeeping Agent</h2>
+        <p style="color:#64748b;margin-bottom:24px;">Enter your password to continue</p>
+    </div>
+    """, unsafe_allow_html=True)
+    col = st.columns([1, 2, 1])[1]
+    with col:
+        pwd = st.text_input("Password", type="password", label_visibility="collapsed",
+                            placeholder="Enter password...")
+        if st.button("Unlock →", use_container_width=True, type="primary"):
+            if pwd == APP_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+    return False
+
+if not check_password():
+    st.stop()
+
 # ── Inject minimal CSS ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
