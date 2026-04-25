@@ -21,7 +21,10 @@ class SupabaseDB:
         self._client = get_client()
         # Set user JWT so RLS applies correctly
         self._client.postgrest.auth(access_token)
-        self._client.auth.set_session(access_token, "")
+        try:
+            self._client.auth.set_session(access_token, access_token)
+        except Exception:
+            pass
 
     def _q(self, table: str):
         return self._client.table(table)

@@ -83,19 +83,18 @@ def handle_oauth_callback():
     """Handle Supabase OAuth redirect — exchange URL token for session."""
     import urllib.parse
     try:
-        # Streamlit puts query params in st.query_params
         params = st.query_params
         access_token = params.get("access_token", "")
-        refresh_token = params.get("refresh_token", "")
+        refresh_token = params.get("refresh_token", refresh_token if False else "")
         if access_token:
             client = get_client()
-            session = client.auth.set_session(access_token, refresh_token)
-            if session and session.session:
-                st.session_state.session = session.session
-                st.session_state.user = session.user
+            res = client.auth.set_session(access_token, refresh_token or access_token)
+            if res and res.session:
+                st.session_state.session = res.session
+                st.session_state.user = res.user
                 st.query_params.clear()
                 return True
-    except Exception as e:
+    except Exception:
         pass
     return False
 
