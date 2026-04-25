@@ -49,13 +49,23 @@ def get_google_oauth_url() -> str:
                 "OAUTH_REDIRECT_URL",
                 "https://ai-bookkeeping-agent.streamlit.app/"
             ),
+            "scopes": "email profile",
         }
     })
     return res.url
 
 
 def is_authenticated() -> bool:
-    return bool(st.session_state.get("session"))
+    if st.session_state.get("session"):
+        return True
+    # Check for OAuth callback tokens in URL
+    try:
+        params = st.query_params
+        if params.get("access_token"):
+            return False  # Let handle_oauth_callback() process it
+    except Exception:
+        pass
+    return False
 
 
 def get_access_token() -> str:
@@ -69,8 +79,33 @@ def get_user():
     return st.session_state.get("user")
 
 
+def handle_oauth_callback():
+    """Handle Supabase OAuth redirect — exchange URL token for session."""
+    import urllib.parse
+    try:
+        # Streamlit puts query params in st.query_params
+        params = st.query_params
+        access_token = params.get("access_token", "")
+        refresh_token = params.get("refresh_token", "")
+        if access_token:
+            client = get_client()
+            session = client.auth.set_session(access_token, refresh_token)
+            if session and session.session:
+                st.session_state.session = session.session
+                st.session_state.user = session.user
+                st.query_params.clear()
+                return True
+    except Exception as e:
+        pass
+    return False
+
+
 def render_auth_page():
     """Full-screen login/signup UI. Returns True when authenticated."""
+    # Handle OAuth redirect callback first
+    if handle_oauth_callback():
+        st.rerun()
+        return
 
     # Centered container
     st.markdown("""

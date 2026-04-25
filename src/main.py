@@ -6,7 +6,7 @@ import pandas as pd
 import io, csv
 from datetime import datetime, timedelta, date
 
-from src.auth import render_auth_page, is_authenticated, sign_out, get_access_token, get_user
+from src.auth import render_auth_page, is_authenticated, sign_out, get_access_token, get_user, handle_oauth_callback
 from src.supabase_db import SupabaseDB
 from src.agent import BookkeepingAgent
 from config.config import config
@@ -48,10 +48,13 @@ html,body,[class*="css"]{font-family:'Source Sans 3','Segoe UI',sans-serif!impor
 </style>
 """, unsafe_allow_html=True)
 
-# ── Auth gate ─────────────────────────────────────────────────────────────────
+# ── Auth gate — handle OAuth redirect first ───────────────────────────────────
 if not is_authenticated():
-    render_auth_page()
-    st.stop()
+    if handle_oauth_callback():
+        st.rerun()
+    else:
+        render_auth_page()
+        st.stop()
 
 # ── Session: DB + Agent ───────────────────────────────────────────────────────
 if "db" not in st.session_state:
