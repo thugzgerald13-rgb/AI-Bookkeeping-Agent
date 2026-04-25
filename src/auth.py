@@ -170,19 +170,15 @@ def render_auth_page():
 
             st.markdown('<div class="divider-text">or</div>', unsafe_allow_html=True)
 
-            google_enabled = bool(os.environ.get("GOOGLE_CLIENT_ID"))
-            if google_enabled:
-                try:
-                    google_url = get_google_oauth_url()
-                    st.markdown(
-                        f'<a href="{google_url}" target="_self" class="google-btn">'
-                        f'<img src="https://www.google.com/favicon.ico" width="18"> Continue with Google</a>',
-                        unsafe_allow_html=True,
-                    )
-                except Exception:
-                    pass
-            else:
-                st.markdown('<div style="text-align:center;font-size:12px;color:#b2bec3;padding:8px">🔒 Email sign-in only (Google OAuth not configured)</div>', unsafe_allow_html=True)
+            try:
+                google_url = get_google_oauth_url()
+                st.markdown(
+                    f'<a href="{google_url}" target="_self" class="google-btn">'
+                    f'<img src="https://www.google.com/favicon.ico" width="18"> Continue with Google</a>',
+                    unsafe_allow_html=True,
+                )
+            except Exception as e:
+                st.caption(f"Google OAuth error: {e}")
 
         with tab_signup:
             name_up  = st.text_input("Full Name", key="su_name", placeholder="Juan dela Cruz")
