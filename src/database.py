@@ -15,7 +15,12 @@ class DB:
     def __init__(self, db_path: str = "data/bookkeeping.db"):
         directory = os.path.dirname(db_path)
         if directory:
-            os.makedirs(directory, exist_ok=True)
+            try:
+                os.makedirs(directory, exist_ok=True)
+                test = os.path.join(directory, '.write_test')
+                open(test, 'w').close(); os.unlink(test)
+            except OSError:
+                db_path = os.path.join('/tmp', os.path.basename(db_path))
         self.db_path = db_path
         self._init_db()
         self._seed_defaults()

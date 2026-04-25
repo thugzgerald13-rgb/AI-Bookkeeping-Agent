@@ -54,7 +54,7 @@ if "db" not in st.session_state:
     st.session_state.db = DB("data/bookkeeping.db")
 if "agent" not in st.session_state:
     api_key = config.api.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    st.session_state.agent = BookkeepingAgent(api_key=api_key or None)
+    st.session_state.agent = BookkeepingAgent(api_key=api_key or None, db=st.session_state.db)
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 
